@@ -1,0 +1,80 @@
+---
+title: "HW4_Problem6"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+# Input the file zip.train  Download data sets from
+# https://web.stanford.edu/~hastie/ElemStatLearn/data.html
+train <- as.data.frame(read.table(file = "zip.train", header = FALSE))
+
+# Extract samples as a single digit
+X <- as.matrix(subset(train,V1==3)) # take only the #3s
+# a row of X is <digit ID> <pixelval top left> ... <pixelval low right>
+
+dim(X);
+keepX <-X[,1]; # use this to keep the actual value of the image 
+               # (this will be a vector of 3's)
+
+X<-X[,-1]; # we are excluding the digit ID (for plotting) since all == 3
+dim(X)     # now size is [total samples] x [256]
+
+myPhi = X; # use this to get a feature map which is simply the identity
+print(dim(myPhi)) # confirms that we have 658 complete samples to form our shit with
+
+# This is a useful function to display an image from the zip code data set
+zimage1 <-function(vec){
+  img <- matrix(vec[1:256],nrow = 16, ncol = 16);
+  img <- t(apply(-img,1,rev));
+  image(img, col = grey(seq(0,1,length = 256)))
+}
+
+#Let's view a sample
+
+zimage1(X[100,])
+Xave=colMeans(X) # what is the average value of a particular pixel across all samples
+zimage1(Xave) # visusally, show us an "average" #3 digit
+
+# average matrix
+mu <- matrix(Xave,ncol = 1)
+
+n = dim(X)[1]
+
+# Sig will be the (1/n)xTx - mu*muT
+Sig <- (1/n)*t(X)%*%X - mu%*%t(mu)
+
+# Perform singular value decomposition
+s <- svd(Sig)
+plot(s$d)
+plot(s$u)
+plot(s$v) # note that this is exactly the same as s$u
+
+ridgeReg <- function(phi, T, lam) {
+  m <- dim(phi)[2];
+  Alam <- t(phi)%*%phi + lam*diag(m);
+  b <- t(phi)%*%T;
+  w = solve(Alam,b)
+}
+
+
+
+for (i in 1:10) {
+  W <- ridgeReg(myPhi, keepX,0.1); # arbitrary lambda = 0.1
+  # plot(myPhi[i,]%*%W)# plot one sample (one image's pixel values applied to w_lam)
+}
+
+lamVal <- 0.1; # arbitrary lambda value
+noiseVal <- 0.5;
+W<-ridgeReg(myPhi, keepX, lamVal);
+for (i in 1:10) {
+  zimage1((Xave+noiseVal*rnorm(Sig)))
+}
+
+
+```

@@ -1,0 +1,183 @@
+---
+title: "KMC"
+output: html_document
+---
+library("ramify")
+library(datasets)
+library(stats)
+library(dplyr)
+data(iris)
+
+```{r}
+# Preview data
+head(iris)
+```
+
+```{r}
+getMeans <- function(Cprev, X,K){
+  p = dim(X)[2]
+  # create a K x P matrix for means
+  M = matrix(data = 0, nrow = K, ncol = p)
+  
+  # combine X and C so we don't have to carry indices
+  XC = cbind(X,Cprev)
+  Ccol = p + 1 # cluster column number
+  
+  # form new means based on previous cluster assignments
+  for (k in 1:K) {
+    in_cluster_k = subset(XC,XC[,Ccol]==k)
+    M[k,] = colMeans(in_cluster_k[,-Ccol])
+  }
+  
+  return(M)
+}
+
+reCluster <- function(X,M,K){
+  n = dim(X)[1]
+  C = matrix(data = 0, nrow = n, ncol = 1)
+  
+  # for each sample calculate distance to each mean
+  # assign cluster to that of closest mean
+  for (i in 1:n) {
+    eucdist = matrix(data = NA, nrow = 1, ncol = K)
+    for (j in 1:K) {
+      eucdist[j] = stats::dist(rbind(X[i,],M[j,]))
+    }
+    C[i] = ramify::argmin(eucdist)
+  }
+  return(C)
+}
+
+converged <- function(clast, cnew) {
+  size = dim(clast)[1]
+  same = TRUE
+  for (i in 1:size) {
+    if (clast[i] != cnew[i]) {
+      same = FALSE
+    }
+  }
+  return(same)
+}
+
+applyKMC <- function(C_initial, X, K, maxIts = 100) { # 
+  # Initial Step 1
+  mnew = getMeans(C_initial,X,K)
+  # Initial Step 2
+  cnew = reCluster(X,mnew,K)
+  
+  its = 1
+  
+  # Store last cluster assignments to compare
+  c_prev = C_initial
+  
+  # Continue full iterations until we converge 
+  # (meaning we see no changes between iterations)
+    while (!converged(c_prev,cnew)){
+    c_prev = cnew
+    mnew = getMeans(c_prev,X,K)
+    cnew = reCluster(X,mnew,K)
+    its = its + 1
+    if (its >= maxIts){ # stop if reached maximum trials
+      break
+    }
+  }
+  return(cnew)
+}
+
+```
+
+
+```{r} 
+# Iris Example:
+
+# these are the 'actual' cluster assignments (the true flower groupings)
+flowers = iris$newcol 
+
+# get matrix dimensions
+n = dim(iris)[1]
+p = dim(iris)[2]
+
+# select number clusters
+K = 3
+for (i in 1:n) {
+  label = iris$Species[i]
+  if (label == "setosa") {
+    flowers[i] = 1
+  } else if (label == "versicolor") {
+    flowers[i] = 2
+  } else  if (label == "virginica"){
+    flowers[i] = 3
+  } else {
+    flowers[i] = NaN
+  }
+}
+
+# Build X and scale data
+X = scale(data.matrix(iris[,-p]))
+
+# Randomize c0
+c0 = matrix(data = 0, nrow = n, ncol = 1)
+for (i in 1:n) {
+  c0[i] = ceiling(runif(1,min = 0, max = K))
+}
+
+# observe initial distribution
+plot(c0,
+     main="Randomized cluster assignments",
+     xlab = "Indices of items",
+     ylab = "Cluster Number")
+
+# Perform K-means clustering and observe final groupings; try with new K, etc!
+myMax = 100 # specify max # iterations
+cfinal = applyKMC(c0,X,K,myMax)
+plot(cfinal,
+     main="Final cluster assignments",
+     xlab = "Indices of items",
+     ylab = "Cluster Number")
+```
+
+```{r}
+# Iris example, broken down
+
+# This shows how our cluster assignments and means changed with each
+# iteration, it is not necessary if you have already run the previous chunk
+cluster_history = flowers #c0
+clast = flowers #c0
+
+# Do a step 1
+means_last = getMeans(clast,X,K)
+means_history = means_last
+
+# Do a step 2
+cnew = reCluster(X,means_last,K)
+
+plot(cnew,
+     main="Randomized cluster assignments",
+     xlab = "Indices of items",
+     ylab = "Cluster Number")
+
+
+numIts = 10
+p = dim(X)[2]
+
+for (i in 2:numIts) {
+  mnew = getMeans(clast,X,K)
+  means_history = cbind(means_history,mnew)
+  
+  cnew = reCluster(X,mnew, K)
+  cluster_history = cbind(cluster_history,cnew)
+
+  plot(cnew)
+  clast = cnew
+}
+```
+
+```{r}
+# Someone smarter can use this to animate a plot of how the cluster
+# assignments change with each iteration
+
+# each group of 4 columns represents means for one iteration
+meansdf = as.data.frame(means_history)
+colnames(meansdf) <- c("Sepal.Length", "Sepal.Width", "Petal.Length","Petal.Width")
+head(meansdf)
+```

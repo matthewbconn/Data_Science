@@ -1,0 +1,54 @@
+---
+title: "HW4_Problem7"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# sample size
+n = 500;
+
+# in population, 30% are '1', 70% are '2'
+# build a sample from this
+t<-sample(c(1,2),n,prob = c(0.3,0.7), replace = TRUE)
+
+# count '1's and '2's
+n2 <- sum(t==2);
+n1 <- n - n2;
+
+
+c(n1,n2)
+
+# Define a function to return the transpose of a matrix that is Az + mu
+rnormvec<-function(n=1,A,mu=0){
+  m=dim(A)[2]
+  z=matrix(rnorm(n*m),nrow=m,ncol=n)
+  x= (A%*%z) + rep(mu,times=n)
+  return(t(x))
+}
+
+# Build a 2x2 matrix
+A1=matrix(c(3,1,2,1),nrow=2,ncol=2);
+A2=matrix(c(1,0,0,1),nrow=2,ncol=2);
+
+# Some mu vectors
+mu1 = c(4,0);
+mu2 = c(1,2);
+
+# Define X1,X2 from our function
+x1 <- rnormvec(n=n1,A1,mu1)
+x2 <- rnormvec(n=n2,A2,mu2)
+
+# get a plot of the distribution of our variables, then show which points to X1, X2
+plot(rbind(x1,x2),asp = 1)
+plot(rbind(x1,x2),asp=1,col=c(rep('red',n1),rep('green',n2)))
+
+# perform singular value decomposition on A1 and look at the D, U and V matrices
+s <-svd(A1)
+s$d
+s$u
+s$v
+```

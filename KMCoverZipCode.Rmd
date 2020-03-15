@@ -1,0 +1,194 @@
+---
+title: "KMCoverZipCode"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+# Define useful functions #
+
+getMeans <- function(Cprev, X,K){
+  p = dim(X)[2]
+  # create a K x P matrix for means
+  M = matrix(data = 0, nrow = K, ncol = p)
+  
+  # combine X and C so we don't have to carry indices
+  XC = cbind(X,Cprev)
+  Ccol = p + 1 # cluster column number
+  
+  # form new means based on previous cluster assignments
+  for (k in 1:K) {
+    in_cluster_k = subset(XC,XC[,Ccol]==k)
+    M[k,] = colMeans(in_cluster_k[,-Ccol])
+  }
+  
+  return(M)
+}
+
+reCluster <- function(X,M,K){
+  n = dim(X)[1]
+  C = matrix(data = 0, nrow = n, ncol = 1)
+  
+  # for each sample calculate distance to each mean
+  # assign cluster to that of closest mean
+  for (i in 1:n) {
+    eucdist = matrix(data = NA, nrow = 1, ncol = K)
+    for (j in 1:K) {
+      eucdist[j] = stats::dist(rbind(X[i,],M[j,]))
+    }
+    C[i] = ramify::argmin(eucdist)
+  }
+  return(C)
+}
+
+converged <- function(clast, cnew) {
+  size = dim(clast)[1]
+  same = TRUE
+  for (i in 1:size) {
+    if (clast[i] != cnew[i]) {
+      same = FALSE
+    }
+  }
+  return(same)
+}
+
+applyKMC <- function(C_initial, X, K, maxIts = 100) { # 
+  # Initial Step 1
+  mnew = getMeans(C_initial,X,K)
+  # Initial Step 2
+  cnew = reCluster(X,mnew,K)
+  
+  its = 1
+  
+  # Store last cluster assignments to compare
+  c_prev = C_initial
+  
+  # Here we want to return the means to help visualize
+  mnew = matrix(data = NA, nrow = K, ncol = dim(X)[2])
+  
+  # Continue full iterations until we converge 
+  # (meaning we see no changes between iterations)
+    while (!converged(c_prev,cnew)){
+    c_prev = cnew
+    mnew = getMeans(c_prev,X,K)
+    cnew = reCluster(X,mnew,K)
+    its = its + 1
+    if (its >= maxIts){ # stop if reached maximum trials
+      break
+    }
+  }
+  return(mnew)
+}
+
+
+# Use this to print digits from phi(x) transpose (one "row" of our feature map)
+  zimage <- function(vec) {
+    img <-   matrix(vec[1:256],nrow=16,ncol=16); 
+    img <- t(apply(-img, 1, rev))
+    image(img,col=grey(seq(0,1,length=256)))
+  }
+```
+
+```{r} 
+# Load up training/testing data
+train <- as.data.frame(read.table(file="zip.train", header=FALSE))
+test <- as.data.frame(read.table(file="zip.test", header=FALSE))
+
+# Extract samples as a single digit; put into matrix form
+# Examine the first column and only take 3's and 5's
+X.train1 <- as.matrix(subset(train,V1 == 1)) # take only the #1s
+X.train2 <- as.matrix(subset(train,V1 == 2)) # take only the #2s
+X.train3 <- as.matrix(subset(train,V1 == 3)) # take only the #3s
+X.train4 <- as.matrix(subset(train,V1 == 4)) # take only the #4s
+X.train5 <- as.matrix(subset(train,V1 == 5)) # take only the #5s
+X.train6 <- as.matrix(subset(train,V1 == 6)) # take only the #6s
+X.train7 <- as.matrix(subset(train,V1 == 7)) # take only the #7s
+X.train8 <- as.matrix(subset(train,V1 == 8)) # take only the #8s
+X.train9 <- as.matrix(subset(train,V1 == 9)) # take only the #9s
+X.train0 <- as.matrix(subset(train,V1 == 0)) # take only the #0s
+X.test1 <- as.matrix(subset(test,V1 == 1)) # take only the #1s
+X.test2 <- as.matrix(subset(test,V1 == 2)) # take only the #2s
+X.test3 <- as.matrix(subset(test,V1 == 3)) # take only the #3s
+X.test4 <- as.matrix(subset(test,V1 == 4)) # take only the #4s
+X.test5 <- as.matrix(subset(test,V1 == 5)) # take only the #5s
+X.test6 <- as.matrix(subset(test,V1 == 6)) # take only the #6s
+X.test7 <- as.matrix(subset(test,V1 == 7)) # take only the #7s
+X.test8 <- as.matrix(subset(test,V1 == 8)) # take only the #8s
+X.test9 <- as.matrix(subset(test,V1 == 9)) # take only the #9s
+X.test0 <- as.matrix(subset(test,V1 == 0)) # take only the #0s
+
+# example of combining 2 digits
+X.train14 <- rbind(X.train1,X.train4)
+  # <digit, 0-9> <pixel value 1 (of 256)> <pixel 2> ... <pixel 256>
+```
+
+```{r}
+#*****************************************#
+## START HERE ##
+              ## select # of clusters (K), data range, max iterations
+#*****************************************#
+K = 3
+myMax = 11
+X <- X.train7[,-1] # remember to drop get rid of the actual labels 
+n = dim(X)[1]
+p = dim(X)[2]
+
+# Randomize cluster assignments
+c0 = matrix(data = 0, nrow = n, ncol = 1)
+for (i in 1:n) {
+  c0[i] = ceiling(runif(1,min = 0, max = K))
+}
+
+mfinal = applyKMC(c0,X,K,myMax)
+for (i in 1:K) {
+  zimage(mfinal[i,])
+}
+```
+
+```{r}
+# This just breaks down some of the above and stores the 
+# progression of means/clustering over iterations. Not necessary
+# if the above chunks were run
+
+plot(c0,
+     main="Randomized cluster assignments",
+     xlab = "Indices of items",
+     ylab = "Cluster Number")
+
+cluster_history = c0
+clast = c0
+
+# Do a step 1
+means_last = getMeans(clast,X,K)
+means_new = means_last
+means_history = means_last
+
+# Do a step 2
+cnew = reCluster(X,means_last,K)
+
+```
+```{r}
+tempMeans = matrix(data = NA, nrow = K, ncol = 256)
+
+for (i in 2:numIts) {
+  mnew = getMeans(clast,X,K)
+  means_history = cbind(means_history,mnew)
+  tempMeans = mnew
+
+  cnew = reCluster(X,mnew, K)
+  cluster_history = cbind(cluster_history,cnew)
+
+  plot(cnew)
+  clast = cnew
+}
+```
+```{r}
+# Look at our clusters
+for (i in 1:K) {
+  zimage(tempMeans[i,])
+}
+```
+
+
+```
